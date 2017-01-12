@@ -6,13 +6,15 @@ from threading import Thread
 import datetime
 import sys
 from copy import deepcopy
+import dijkstra_d
+
 
 #some constants
 re_check_off_time = 1;
-off_time = 4;
-re_check_send_time = 2;
+off_time = 3;
+re_check_send_time = 1;
 broadcast_delay = 1;
-off_time_broadcast = 5;
+off_time_broadcast = 3;
 
 #Variable to store config file data
 data = [];
@@ -25,41 +27,12 @@ no_of_neighbours = 0;
 graph = {};
 graph_time_update = {};
 #variable to store broadcast message
-broad_cast_msg = "2?Null";
+broad_cast_msg = "";
 
 check_last_time = {}
 
 #Server
 serverSocket = socket(AF_INET, SOCK_DGRAM)
-
-def dijsktra(graph, initial):
-  visited = {initial: 0}
-  path = {}
-
-  nodes = set(graph.nodes)
-
-  while nodes: 
-    min_node = None
-    for node in nodes:
-      if node in visited:
-        if min_node is None:
-          min_node = node
-        elif visited[node] < visited[min_node]:
-          min_node = node
-
-    if min_node is None:
-      break
-
-    nodes.remove(min_node)
-    current_weight = visited[min_node]
-
-    for edge in graph.edges[min_node]:
-      weight = current_weight + graph.distance[(min_node, edge)]
-      if edge not in visited or weight < visited[edge]:
-        visited[edge] = weight
-        path[edge] = min_node
-
-  return visited, path
 
 def startServer():
 	serverSocket.bind(('', int(sys.argv[2])))
@@ -78,7 +51,7 @@ def connection_state_changed():
 
 	graph[router_name] = temp;
 
-	graphPrint();
+	# graphPrint();
 
 
 def handleBroadcast(message, sender, orignal_message):
@@ -125,7 +98,8 @@ def handleBroadcast(message, sender, orignal_message):
 						#print("sending to: "+ data[x][0])
 						serverSocket.sendto(orignal_message, ("localhost", int(data[x][2])))
 					except Exception as e:
-						print(e)
+						# print(e)
+						pass
 					
 
 
@@ -179,40 +153,6 @@ def HandlecheckRouterState():
 				th = Thread(target=handleBroadcast, args=(message, addr[1], orignal_message))
 				th.daemon = True
 				th.start();
-				# if(message[1] != router_name):
-				# 	obj = eval(message[2]);
-				# 	# graphPrint();
-				# 	# print("__________________________")
-				# 	# print(message[1]+ "::::::::::"+ str(obj))
-				# 	# print("__________________________")
-
-				# 	check = False
-
-
-
-				# 	print(message[1],message[3]);
-				# 	if(message[1] not in graph):
-				# 		check_last_time[message[1]] = {}
-				# 		check_last_time[message[1]]['time'] = datetime.datetime.now();
-				# 		check_last_time[message[1]]['seq'] = message[3];
-				# 	elif(int(check_last_time[message[1]]['seq']) < int(message[3]) ):
-				# 		check_last_time[message[1]]['time'] = datetime.datetime.now();
-				# 		check_last_time[message[1]]['seq'] = message[3];
-				# 		True;
-
-				# 	if(message[1] not in graph):
-				# 		graph[message[1]] = obj;
-				# 		#graphPrint();
-
-				# 	elif(graph[message[1]]["seq"] != obj["seq"]):
-				# 		graph[message[1]] = obj;
-				# 		#graphPrint();
-
-					
-				# 	if check:
-				# 		for x in range(0,no_of_neighbours):
-				# 			if(int(data[x][2]) != addr[1]):
-				# 				serverSocket.sendto(orignal_message, ("localhost", int(data[x][2])))
 
 		except Exception as e:
 			pass
@@ -260,7 +200,7 @@ def graphPrint():
 			print (x+":->", end="");
 	
 			for y in graph[x]["data"]:
-				print(y[0]+"," , end="")
+				print(y[0]+"("+y[1]+")," , end="")
 	
 			print("\n")		
 
@@ -275,12 +215,71 @@ def autoPrint():
 	while True:
 		print ("+++++++++++++++:: ", str(x));
 		graphPrint();
+		# print(graph)
 		time.sleep(2);
+
+# def call_dikstra():		
+# 	while True:
+# 		try:
+# 			localgraph = deepcopy(graph);
+# 			di_graph = dijkstra.Graph();
+
+# 			#inserting Nodes
+# 			for x in localgraph:
+# 				print(router_name, x, type(router_name), type(x))
+# 				di_graph.add_node(str(router_name), str(x));
+
+# 			#inserting Edges
+# 			for x in localgraph:
+# 				for y in graph[x]["data"]:
+# 					di_graph.add_edge(router_name, x, y[0], y[1] )
+
+
+# 			visited,path = dijsktra.dijsktra(di_graph, router_name);
+# 			print (visited, path)
+# 		except Exception as e:
+# 			print(e)
+
+# 		time.sleep(2);
 
 def call_dikstra():
 	while True:
-		result = dijsktra(graph, 'A');
-		print(result)
+
+		try:
+			localgraph = deepcopy(graph)
+			G = {}
+			for x in graph:
+				G[x] = {}
+				for y in localgraph[x]["data"]:
+					G[x][y[0]] = float(y[1])
+
+			# print(G)
+
+			print("_______________")
+			print("I am router ", router_name)
+
+			for x in graph:
+				if x != router_name:
+					path = dijkstra_d.shortestPath(G, router_name, x)
+					print("Least cost path to router ",x,":",  end="")
+
+					# print(path)
+					cost = 0;
+
+					for x in range(0, len(path)-1):
+						cost += G[path[x]][path[x+1]]
+						print(path[x], end="")
+
+					print(path[len(path)-1],end="")
+
+					print(" and the cost: ",end = "")
+					print("%.1f" % cost)
+
+			print("_______________")
+
+		except Exception as e:
+			print(e)
+			pass
 		time.sleep(2);
 
 startServer()
@@ -301,9 +300,10 @@ e = Thread(target=checkExpiredRouters)
 e.daemon = True
 e.start();
 
-a = Thread(target=autoPrint)
-a.daemon = True;
-a.start();
+d = Thread(target=call_dikstra)
+d.daemon = True;
+d.start();
+
 
 while True:
 	time.sleep(re_check_send_time);
